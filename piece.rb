@@ -1,8 +1,9 @@
 require 'colorize'
+require 'debugger'
 
 class Piece
-  
-  attr_reader :color, :pos, :board, :kinged
+  attr_reader :color, :board
+  attr_accessor :pos, :kinged
   
   def initialize(pos, color, board, kinged = false)
     @pos, @color, @board = pos, color, board
@@ -18,25 +19,65 @@ class Piece
     "pos: #{pos}, color: #{color}"
   end
   
+  def valid_move_seq?(move_sequence)
+    duped_board = board.dup
+    duped_piece = self.dup(duped_board)
+    begin
+      duped_piece.perform_moves!(move_sequence)
+    rescue InvalidMoveError => e
+      puts e.message
+      return false
+    end
+    true
+  end
+  
   def perform_moves!(move_sequence)
     if move_sequence.count == 1
       target = move_sequence[0]
-      #try sliding first
-      if ( perform_slide(target) || perform_jump(target) )
-        board.move(self, target) 
+      #if only one move try sliding first, then try a single jump
+      if perform_slide(target) || perform_jump(target)
+        board.move(pos, target)
       else
         raise InvalidMoveError.new "Can't move there"
       end
     else
-      move_sequence.each do |move|
-        
-      
+      #multiple moves must be all jumps
+      move_sequence.each do |target|
+        if perform_jump(target)
+          board.move(pos,target)
+        else
+          raise InvalidMoveError.new "One of those jumps is illegal"
+        end
+      end
+    end
+    maybe_promote
+  end
+  
+  def perform_moves(move_sequence)
+    if valid_move_seq?(move_sequence)
+      perform_moves!(move_sequence)
+    else
+      raise InvalidMoveError.new "Invalid move"
+    end
+  end
+  
+  def dup(duped_board)
+    Piece.new(pos, color, duped_board)
+  end
+  
+  def maybe_promote
+    self.kinged = (color == :black ? pos.first == 7 : pos.first == 0)
+  end
+  
+  # private
+  def get_direction
+    color == :black ? 1 : -1
   end
   
   def perform_slide(target)
     return false unless board[target].nil? && on_board?(target)
-    move_diffs = slide_diffs[0...2] unless kinged
-    move_diffs.each do |diff|
+    diffs = kinged ? move_diffs : move_diffs[0...2]
+    diffs.each do |diff|
       return true if [pos.first + diff.first, pos.last + diff.last] == target
     end
     false
@@ -44,9 +85,9 @@ class Piece
   
   def perform_jump(target)
     return false unless board[target].nil? && on_board?(target)
-    move_diffs = slide_diffs[0...2] unless kinged
+    diffs = kinged ? move_diffs : move_diffs[0...2]
     
-    move_diffs.each do |diff|
+    diffs.each do |diff|
       opponent = [pos.first + diff.first, pos.last + diff.last]
       jump = [opponent.first + diff.first, opponent.last + diff.last]
       
@@ -58,8 +99,7 @@ class Piece
       
       #all good, remove opponent and return true
       board[opponent] = nil
-      true
-      end
+      return true
     end
     false
   end
@@ -76,12 +116,7 @@ class Piece
   def on_board?(pos)
     pos.all? {|coord| (0..7).cover?(coord)}
   end
-  
-  private
-  def get_direction
-    color == :black ? 1 : -1
-  end
 end
 
-class InvalidMoveError < RunTimeError
+class InvalidMoveError < StandardError
 end

@@ -10,21 +10,6 @@ class Board
     set_up_pieces if start_board
   end
   
-  def set_up_pieces
-    place_pieces(:black)
-    place_pieces(:white)
-  end
-  
-  def place_pieces(color)
-    piece_rows = (color == :black ? [0, 1] : [6, 7] )
-    self.rows.each_with_index do |row, i|
-      next unless piece_rows.include?(i)
-      row.each_index do |j|
-        Piece.new([i, j], color, self)
-      end
-    end
-  end
-  
   def add_piece(piece)
     self[piece.pos] = piece
   end
@@ -39,12 +24,12 @@ class Board
     @rows[x][y] = piece
   end
   
-  # def occupant(pos)
-  #   return nil if self[pos].nil?
-  #   self[pos].color
-  # end
-  
-  def move()
+  def move(start_pos, end_pos)
+    current_piece = self[start_pos]
+    current_piece.pos = end_pos
+    self.add_piece(current_piece)
+    self[start_pos] = nil
+  end
   
   def display(cursor_pos = nil, cursor_start = nil)
     system("clear")
@@ -67,4 +52,31 @@ class Board
     nil
   end
   
+  def dup
+    duped_board = Board.new(false)
+    pieces.each do |piece|
+      duped_board.add_piece(piece.dup(duped_board))
+    end
+    duped_board
+  end
+  
+  private
+  def set_up_pieces
+    place_pieces(:black)
+    place_pieces(:white)
+  end
+  
+  def place_pieces(color)
+    piece_rows = (color == :black ? [0, 1] : [6, 7] )
+    self.rows.each_with_index do |row, i|
+      next unless piece_rows.include?(i)
+      row.each_index do |j|
+        Piece.new([i, j], color, self)
+      end
+    end
+  end
+  
+  def pieces
+    @rows.flatten.compact
+  end
 end
