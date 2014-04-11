@@ -11,21 +11,41 @@ class Piece
     @board.add_piece(self)
   end
   
-  def get_sprite
-    color == :black ? "\u25c9 ".black : "\u25c9 ".magenta
+  def to_s
+    if kinged
+      color == :black ? "\u265A ".black : "\u265A ".magenta
+    else
+      color == :black ? "\u25c9 ".black : "\u25c9 ".magenta
+    end
   end
   
   def inspect
     "pos: #{pos}, color: #{color}"
   end
   
+  def dup(duped_board)
+    Piece.new(pos, color, duped_board, kinged)
+  end
+  
+  def perform_moves(move_sequence)
+    if valid_move_seq?(move_sequence)
+      perform_moves!(move_sequence)
+    else
+      raise InvalidMoveError.new "Invalid move, try again"
+    end
+  end
+  
+  protected
   def valid_move_seq?(move_sequence)
+    if move_sequence.count == 0
+      raise InvalidMoveError.new "Move can't be empty" 
+    end
+    
     duped_board = board.dup
     duped_piece = self.dup(duped_board)
     begin
       duped_piece.perform_moves!(move_sequence)
-    rescue InvalidMoveError => e
-      puts e.message
+    rescue InvalidMoveError
       return false
     end
     true
@@ -53,31 +73,15 @@ class Piece
     maybe_promote
   end
   
-  def perform_moves(move_sequence)
-    if valid_move_seq?(move_sequence)
-      perform_moves!(move_sequence)
-    else
-      raise InvalidMoveError.new "Invalid move"
-    end
-  end
-  
-  def dup(duped_board)
-    Piece.new(pos, color, duped_board)
-  end
-  
-  def maybe_promote
-    self.kinged = (color == :black ? pos.first == 7 : pos.first == 0)
-  end
-  
-  # private
+  private
   def get_direction
     color == :black ? 1 : -1
   end
   
   def perform_slide(target)
     return false unless board[target].nil? && on_board?(target)
-    diffs = kinged ? move_diffs : move_diffs[0...2]
-    diffs.each do |diff|
+
+    move_diffs.each do |diff|
       return true if [pos.first + diff.first, pos.last + diff.last] == target
     end
     false
@@ -85,9 +89,8 @@ class Piece
   
   def perform_jump(target)
     return false unless board[target].nil? && on_board?(target)
-    diffs = kinged ? move_diffs : move_diffs[0...2]
-    
-    diffs.each do |diff|
+        
+    move_diffs.each do |diff|
       opponent = [pos.first + diff.first, pos.last + diff.last]
       jump = [opponent.first + diff.first, opponent.last + diff.last]
       
@@ -105,16 +108,22 @@ class Piece
   end
   
   def move_diffs
-    [
+    diffs = [
       [ get_direction, 1],
       [ get_direction, -1],
       [ -(get_direction), 1],
       [ -(get_direction), -1]
     ]
+    self.kinged ? diffs : diffs[0...2]
   end
   
   def on_board?(pos)
     pos.all? {|coord| (0..7).cover?(coord)}
+  end
+  
+  def maybe_promote
+    return true if kinged
+    self.kinged = (color == :black ? pos.first == 7 : pos.first == 0)
   end
 end
 
